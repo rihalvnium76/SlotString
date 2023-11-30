@@ -14,7 +14,9 @@ If you're not comfortable adding the entire class to your project, you can copy 
 
 ## Performance
 
-Tested on personal computer, for reference only.
+500000 loops are tested on personal computer, for reference only.
+
+See `SlotStringTest.performanceComparison()`
 
 ```LOG
 [I][performanceOfSamePattern] elapsed time of qformat(ms): 1860

@@ -55,7 +55,8 @@ public class SlotStringTest {
   private static void testQFormat(SlotString slot, Map<String, Object> dest) {
     assertEquals("[-123] [-Abc] [-1_A]", slot.qformat("[${123}] [#{Abc}] [{1_A}]", dest));
     assertEquals("[-123] [-123] [-123]", slot.qformat("[${123}] [#{123}] [{123}]", dest));
-    assertEquals("[] [] [] []", slot.qformat("[${ABC}] [#{NONE}] [{}] [${4}]", dest));
+    assertEquals("[] [] []", slot.qformat("[${ABC}] [#{NONE}] [{}]", dest));
+    assertEquals("[10000000000] []", slot.qformat("[{0}] [${4}]", dest));
     
     assertEquals("[#{0}] [${0}] [{0}] [\\] [*\\] [*}]", slot.qformat("[\\#\\{0\\}] [\\$\\{0\\}] [\\{0\\}] [\\\\] [{\\\\}] [{\\}}]", dest));
     assertEquals(" <#1.0> <#2.0> <#$1.0> <#${2}> <#", slot.qformat(" <#${1}> <\\#${2}> <#\\${1}> <#$\\{2}> <#${1\\}>", dest));
@@ -74,6 +75,7 @@ public class SlotStringTest {
     assertEquals("[-123] [-123] [-123]", slot.format(dest));
     
     assertEquals("[] [] [] []", slot.compile("[${ABC}] [#{NONE}] [{}] [${4}]").format(dest));
+    assertEquals("[10000000000] []", slot.qformat("[{0}] [${4}]", dest));
     
     assertEquals("[#{0}] [${0}] [{0}] [\\] [*\\] [*}]", slot.compile("[\\#\\{0\\}] [\\$\\{0\\}] [\\{0\\}] [\\\\] [{\\\\}] [{\\}}]").format(dest));
     assertEquals(" <#1.0> <#2.0> <#$1.0> <#${2}> <#", slot.compile(" <#${1}> <\\#${2}> <#\\${1}> <#$\\{2}> <#${1\\}>").format(dest));
@@ -90,6 +92,7 @@ public class SlotStringTest {
     dest.put("JOIN_LIST", list);
     
     dest.put("BIGINT", new BigInteger("123456789012345"));
+    dest.put("BIGDECIMAL", new BigDecimal("1E+10"));
     
     SlotString slot4 = new SlotString() {
       
@@ -98,7 +101,10 @@ public class SlotStringTest {
       @SuppressWarnings("unchecked")
       @Override
       protected String asString(Object val, boolean preventDefault) {
-        super.asString(val, true);
+        String ret = super.asString(val, true);
+        if (ret != null) {
+          return ret;
+        }
         if (val instanceof Date) {
           return dateFmt.format(val);
         } else if (val instanceof ArrayList<?>) {
@@ -112,8 +118,8 @@ public class SlotStringTest {
 
     };
     
-    String expected = "[2023-12-01 01:14:27] [1, 2, 3] [123456789012345]";
-    String pattern = "[#{DATE}] [${JOIN_LIST}] [{BIGINT}]";
+    String expected = "[2023-12-01 01:14:27] [1, 2, 3] [123456789012345] [10000000000]";
+    String pattern = "[#{DATE}] [${JOIN_LIST}] [{BIGINT}] [{BIGDECIMAL}]";
     assertEquals(expected, slot4.compile(pattern).format(dest));
     assertEquals(expected, slot4.qformat(pattern, dest));
   }
