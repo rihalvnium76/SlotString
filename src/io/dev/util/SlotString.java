@@ -4,209 +4,130 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Map;
 
-// @formatter:off
 /**
+ * 模板字符串格式化器.<br>
+ * <br>
  * 将模板字符串中的占位符（${var}、#{var}、{var}）替换为替换表中键为 var 的值.<br>
  * 替换表中的值默认使用 toString() 转为字符串，BigDecimal 类型的值会使用 toPlainString() 转换，null 值会被转为 "".<br>
- * 支持使用 \ 转义符号为普通文字.<br>
+ * 支持使用 \ 转义符号为普通文字或键.<br>
  * 使用不支持的语法会导致非预期的解析.
  */
-//@formatter:on
 public class SlotString {
+  
   /**
-   * 结果缓冲区.
+   * 文本类型 的 编译的字符串片段.
    */
-  private StringBuilder res;
+  private static final int TEXT_TYPE = 0;
   /**
-   * 变量名缓冲区.
+   * 键名类型 的 编译的字符串片段.
    */
-  private StringBuilder key;
+  private static final int KEY_TYPE = 1;
   /**
-   * 编译的字符串.
+   * 使用 qformat 的解析逻辑.
+   */
+  private static final int QFORMAT_MODE = 0;
+  /**
+   * 使用 compile 的解析逻辑.
+   */
+  private static final int COMPILE_MODE = 1;
+
+  /**
+   * 编译的字符串片段.
    */
   private String[] parts;
   /**
-   * 编译的字符串的类型。0: 普通文本; 1: 变量名.
+   * 编译的字符串片段的类型.
    */
   private int[] types;
+  /**
+   * 多线程支持.
+   */
+  private boolean multiThread;
+  /**
+   * 共用的结果缓冲区（仅非多线程可用）.
+   */
+  private StringBuilder res;
+  /**
+   * 共用的键名缓冲区（仅非多线程可用）.
+   */
+  private StringBuilder key;
 
   /**
-   * 初始化共用的缓冲区.
+   * 创建非多线程模式且不使用预编译模板字符串功能的格式化器.<br>
+   * 适用于使用不同的模板字符串进行格式化.<br>
+   * 仅 qformat 方法可用.
    */
   public SlotString() {
-    res = new StringBuilder();
-    key = new StringBuilder();
+    this(false);
   }
 
   /**
-   * 初始化共用的缓冲区并编译模板字符串.
-   * 
-   * @param pattern 模板字符串.
+   * 外部调用时创建不使用预编译模板字符串功能的格式化器，可指定是否开启多线程支持.<br>
+   * 适用于使用不同的模板字符串进行格式化.<br>
+   * 仅 qformat 方法可用.
+   * @param multiThread 是否开启多线程支持.
+   */
+  public SlotString(boolean multiThread) {
+    this.multiThread = multiThread;
+    if (!multiThread) {
+      res = new StringBuilder();
+      key = new StringBuilder();
+    }
+  }
+  
+  /**
+   * 创建开启多线程支持，且预编译模板符串的格式化器.<br>
+   * 适用于使用相同的模板字符串进行格式化.<br>
+   * 全部方法可用，但编译的结果，format 方法会使用，而 qformat 方法不使用.
+   * @param pattern 模板符串.
    */
   public SlotString(String pattern) {
-    this();
+    this(true);
     compile(pattern);
   }
 
   /**
-   * 将模板字符串中的占位符按替换表替换为值.<br>
-   * 此方法不进行预编译模板字符串，而直接解析.<br>
-   * 适用于动态的模板字符串.
-   * 
-   * @param pattern 模板字符串
-   * @param dest    替换表
-   * @return 输出字符串.
+   * 预编译模板符串并存储编译结果.<br>
+   * 可加速 format 方法的格式化.
+   * @param pattern 模板符串.
    */
-  public String qformat(String pattern, Map<String, Object> dest) {
-    if (pattern == null || pattern.isEmpty()) {
-      return pattern;
+  protected void compile(String pattern) {
+    if (pattern == null) {
+      return;
     }
-    // initialize buffers
-    res.setLength(0);
-    int state = 0;
-    char prev = 0;
-    for (int i = 0; i < pattern.length(); ++i) {
-      char c = pattern.charAt(i);
-      if (state == 0) {
-        if (c == '#' || c == '$') {
-          state = 1;
-          prev = c;
-        } else if (c == '{') {
-          state = 2;
-          key.setLength(0);
-        } else if (c == '\\') {
-          state = 3;
-        } else {
-          res.append(c);
-        }
-      } else if (state == 1) {
-        if (c == '{') {
-          state = 2;
-          key.setLength(0);
-        } else {
-          state = 0;
-          res.append(prev);
-          --i; // re-parse
-        }
-      } else if (state == 2) {
-        if (c == '}') {
-          state = 0;
-          Object val = null;
-          if (dest != null) {
-            val = dest.get(key.toString());
-          }
-          res.append(asString(val, false));
-        } else if (c == '\\') {
-          state = 4;
-        } else {
-          key.append(c);
-        }
-      } else if (state == 3) {
-        state = 0;
-        res.append(c);
-      } else if (state == 4) {
-        state = 2;
-        key.append(c);
-      }
-    }
-    return res.toString();
-  }
-
-  /**
-   * 预编译模板字符串.<br>
-   * 适用于固定的模板字符串.
-   * 
-   * @param pattern 模板字符串.
-   */
-  public SlotString compile(String pattern) {
-    if (pattern == null || pattern.isEmpty()) {
-      parts = new String[] { "" };
-      types = new int[] { 0 };
-      return this;
-    }
-    ArrayList<String> parts0 = new ArrayList<>();
-    ArrayList<Integer> types0 = new ArrayList<>();
-    res.setLength(0);
-    int state = 0;
-    char prev = 0;
-    for (int i = 0; i < pattern.length(); ++i) {
-      char c = pattern.charAt(i);
-      if (state == 0) {
-        if (c == '#' || c == '$') {
-          state = 1;
-          prev = c;
-        } else if (c == '{') {
-          state = 2;
-          key.setLength(0);
-          if (res.length() != 0) {
-            parts0.add(res.toString());
-            types0.add(0);
-            res.setLength(0);
-          }
-        } else if (c == '\\') {
-          state = 3;
-        } else {
-          res.append(c);
-        }
-      } else if (state == 1) {
-        if (c == '{') {
-          state = 2;
-          key.setLength(0);
-          if (res.length() != 0) {
-            parts0.add(res.toString());
-            types0.add(0);
-            res.setLength(0);
-          }
-        } else {
-          state = 0;
-          res.append(prev);
-          --i; // re-parse
-        }
-      } else if (state == 2) {
-        if (c == '}') {
-          state = 0;
-          parts0.add(key.toString());
-          types0.add(1);
-        } else if (c == '\\') {
-          state = 4;
-        } else {
-          key.append(c);
-        }
-      } else if (state == 3) {
-        state = 0;
-        res.append(c);
-      } else if (state == 4) {
-        state = 2;
-        key.append(c);
-      }
-    }
+    StringBuilder res = new StringBuilder();
+    StringBuilder key = new StringBuilder();
+    ArrayList<Object[]> symbols = new ArrayList<>();
+    parse(COMPILE_MODE, pattern, res, key, symbols);
     if (res.length() != 0) {
-      parts0.add(res.toString());
-      types0.add(0);
+      symbols.add(new Object[] { TEXT_TYPE, res.toString() });
     }
-    parts = parts0.toArray(new String[parts0.size()]);
-    types = types0.stream().mapToInt(Integer::valueOf).toArray();
-    return this;
+    parts = new String[symbols.size()];
+    types = new int[symbols.size()];
+    for (int i = 0; i < symbols.size(); ++i) {
+      Object[] symbol = symbols.get(i);
+      types[i] = ((Integer) symbol[0]).intValue();
+      parts[i] = (String) symbol[1];
+    }
   }
-
+  
   /**
-   * 将模板字符串中的占位符按替换表替换为值.<br>
-   * 此方法使用预编译的模板字符串进行处理.<br>
-   * 如果没有进行过预编译，则本方法返回 null.
+   * 使用预编译的模板字符串进行格式化，模板字符串中的占位符将会被替换为替换表中对应的值.<br>
+   * 未先进行预编译字符串调用该方法会返回 null.
    * 
-   * @param dest 替换表
+   * @param dest 占位符替换表.
    * @return 输出字符串.
    */
   public String format(Map<String, Object> dest) {
     if (parts == null || types == null) {
       return null;
     }
-    res.setLength(0);
+    StringBuilder res = new StringBuilder();
     for (int i = 0; i < types.length; ++i) {
       int type = types[i];
-      if (type == 0) {
+      if (type == TEXT_TYPE) {
         res.append(parts[i]);
-      } else if (type == 1) {
+      } else if (type == KEY_TYPE) {
         Object val = null;
         if (dest != null) {
           val = dest.get(parts[i]);
@@ -216,15 +137,40 @@ public class SlotString {
     }
     return res.toString();
   }
-
+  
   /**
-   * 将替换表中的值转换为字符串.<br>
-   * 如果需要扩展此方法支持的转换类型，可以子类重写此方法，并调用 {@code super.asString(val, true)}，<br>
-   * 之后该方法会在原调用 toString() 的地方返回 null.<br>
-   * 
-   * @param val 值
-   * @param preventDefault 是否阻止默认的 toString() 转换.
-   * @return 值的字符串形式.
+   * 不使用预编译结果直接根据模板字符串进行格式化，模板字符串中的占位符将会被替换为替换表中对应的值.
+   * @param pattern 模板字符串.
+   * @param dest 占位符替换表.
+   * @return 输出字符串.
+   */
+  public String qformat(String pattern, Map<String, Object> dest) {
+    if (pattern == null || pattern.isEmpty()) {
+      return pattern;
+    }
+    StringBuilder res;
+    StringBuilder key;
+    if (multiThread) {
+      res = new StringBuilder();
+      key = new StringBuilder();
+    } else {
+      res = this.res;
+      key = this.key;
+      res.setLength(0);
+      key.setLength(0);
+    }
+    parse(QFORMAT_MODE, pattern, res, key, dest);
+    return res.toString();
+  }
+  
+  /**
+   * 将替换表的值转化为字符串.<br>
+   * 重写该方法，并在新实现开头调用 {@code super.asString(val, true)} 可实现在原有转换规则的基础上扩展.<br>
+   * 该方法 preventDefault 为 true，遇到非 null 和 BigDecimal 类的 val 会返回 null.
+   *  
+   * @param val 替换表的值
+   * @param preventDefault 是否阻止默认的调用 toString() 行为.
+   * @return 转换后的字符串.
    */
   protected String asString(Object val, boolean preventDefault) {
     if (val == null) {
@@ -237,5 +183,102 @@ public class SlotString {
     } else {
       return val.toString();
     }
+  }
+  
+  /**
+   * compile 和 qformat 的公共解析部分.
+   * 
+   * @param mode 模式，标记方法调用者.
+   * @param pattern 模板字符串.
+   * @param res 使用的结果缓冲区.
+   * @param key 使用的键名缓冲区.
+   * @param ext 占位符替换表或编译结果缓冲区.
+   */
+  private void parse(int mode, String pattern, StringBuilder res, StringBuilder key, Object ext) {
+    int state = 0;
+    char prev = 0;
+    for (int i = 0; i < pattern.length(); ++i) {
+      char c = pattern.charAt(i);
+      if (state == 0) {
+        if (c == '#' || c == '$') {
+          state = 1;
+          prev = c;
+        } else if (c == '{') {
+          state = 2;
+          key.setLength(0);
+        } else if (c == '\\') {
+          state = 3;
+        } else {
+          res.append(c);
+        }
+      } else if (state == 1) {
+        if (c == '{') {
+          state = 2;
+          key.setLength(0);
+        } else {
+          state = 0;
+          res.append(prev);
+          --i; // re-parse
+        }
+      } else if (state == 2) {
+        if (c == '}') {
+          state = 0;
+          parseQformat(mode, res, key, ext);
+          parseCompile(mode, res, key, ext);
+        } else if (c == '\\') {
+          state = 4;
+        } else {
+          key.append(c);
+        }
+      } else if (state == 3) {
+        state = 0;
+        res.append(c);
+      } else if (state == 4) {
+        state = 2;
+        key.append(c);
+      }
+    }
+  }
+  
+  /**
+   * qformat 的替换表值处理逻辑.
+   * @param mode 固定为 QFORMAT_MODE，其它值不执行.
+   * @param res 使用的结果缓冲区.
+   * @param key 使用的键名缓冲区.
+   * @param ext 占位符替换表.
+   */
+  @SuppressWarnings("unchecked")
+  private void parseQformat(int mode, StringBuilder res, StringBuilder key, Object ext) {
+    if (mode != QFORMAT_MODE) {
+      return;
+    }
+    Map<String, Object> dest = (Map<String, Object>) ext;
+    
+    Object val = null;
+    if (dest != null) {
+      val = dest.get(key.toString());
+    }
+    res.append(asString(val, false));
+  }
+  
+  /**
+   * compile 的解析结果记录逻辑.
+   * @param mode 固定为 COMPILE_MODE，其它值不执行.
+   * @param res 使用的结果缓冲区.
+   * @param key 使用的键名缓冲区.
+   * @param ext 编译结果缓冲区.
+   */
+  @SuppressWarnings("unchecked")
+  private void parseCompile(int mode, StringBuilder res, StringBuilder key, Object ext) {
+    if (mode != COMPILE_MODE) {
+      return;
+    }
+    ArrayList<Object[]> symbols = (ArrayList<Object[]>) ext;
+    
+    if (res.length() != 0) {
+      symbols.add(new Object[] { TEXT_TYPE, res.toString() });
+      res.setLength(0);
+    }
+    symbols.add(new Object[] { KEY_TYPE, key.toString() });
   }
 }
