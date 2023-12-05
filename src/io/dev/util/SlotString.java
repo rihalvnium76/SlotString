@@ -22,15 +22,11 @@ public class SlotString {
    * 键名类型 的 编译的字符串片段.
    */
   private static final int KEY_TYPE = 1;
-  /**
-   * 使用 qformat 的解析逻辑.
-   */
-  private static final int QFORMAT_MODE = 0;
-  /**
-   * 使用 compile 的解析逻辑.
-   */
-  private static final int COMPILE_MODE = 1;
 
+  /**
+   * 是否在编译模式.
+   */
+  private boolean compiling;
   /**
    * 编译的字符串片段.
    */
@@ -98,7 +94,9 @@ public class SlotString {
     StringBuilder res = new StringBuilder();
     StringBuilder key = new StringBuilder();
     ArrayList<Object[]> symbols = new ArrayList<>();
-    parse(COMPILE_MODE, pattern, res, key, symbols);
+    compiling = true;
+    parse(pattern, res, key, symbols);
+    compiling = false;
     if (res.length() != 0) {
       symbols.add(new Object[] { TEXT_TYPE, res.toString() });
     }
@@ -159,7 +157,7 @@ public class SlotString {
       res.setLength(0);
       key.setLength(0);
     }
-    parse(QFORMAT_MODE, pattern, res, key, dest);
+    parse(pattern, res, key, dest);
     return res.toString();
   }
   
@@ -188,13 +186,13 @@ public class SlotString {
   /**
    * compile 和 qformat 的公共解析部分.
    * 
-   * @param mode 模式，标记方法调用者.
    * @param pattern 模板字符串.
    * @param res 使用的结果缓冲区.
    * @param key 使用的键名缓冲区.
    * @param ext 占位符替换表或编译结果缓冲区.
    */
-  private void parse(int mode, String pattern, StringBuilder res, StringBuilder key, Object ext) {
+  @SuppressWarnings("unchecked")
+  private void parse(String pattern, StringBuilder res, StringBuilder key, Object ext) {
     int state = 0;
     char prev = 0;
     for (int i = 0; i < pattern.length(); ++i) {
@@ -223,8 +221,11 @@ public class SlotString {
       } else if (state == 2) {
         if (c == '}') {
           state = 0;
-          parseQformat(mode, res, key, ext);
-          parseCompile(mode, res, key, ext);
+          if (compiling) {
+            parseCompile(res, key, (ArrayList<Object[]>) ext);
+          } else {
+            parseQformat(res, key, (Map<String, Object>) ext);
+          }
         } else if (c == '\\') {
           state = 4;
         } else {
@@ -242,18 +243,11 @@ public class SlotString {
   
   /**
    * qformat 的替换表值处理逻辑.
-   * @param mode 固定为 QFORMAT_MODE，其它值不执行.
    * @param res 使用的结果缓冲区.
    * @param key 使用的键名缓冲区.
-   * @param ext 占位符替换表.
+   * @param dest 占位符替换表.
    */
-  @SuppressWarnings("unchecked")
-  private void parseQformat(int mode, StringBuilder res, StringBuilder key, Object ext) {
-    if (mode != QFORMAT_MODE) {
-      return;
-    }
-    Map<String, Object> dest = (Map<String, Object>) ext;
-    
+  private void parseQformat(StringBuilder res, StringBuilder key, Map<String, Object> dest) {
     Object val = null;
     if (dest != null) {
       val = dest.get(key.toString());
@@ -263,18 +257,11 @@ public class SlotString {
   
   /**
    * compile 的解析结果记录逻辑.
-   * @param mode 固定为 COMPILE_MODE，其它值不执行.
    * @param res 使用的结果缓冲区.
    * @param key 使用的键名缓冲区.
-   * @param ext 编译结果缓冲区.
+   * @param symbols 编译结果缓冲区.
    */
-  @SuppressWarnings("unchecked")
-  private void parseCompile(int mode, StringBuilder res, StringBuilder key, Object ext) {
-    if (mode != COMPILE_MODE) {
-      return;
-    }
-    ArrayList<Object[]> symbols = (ArrayList<Object[]>) ext;
-    
+  private void parseCompile(StringBuilder res, StringBuilder key, ArrayList<Object[]> symbols) {
     if (res.length() != 0) {
       symbols.add(new Object[] { TEXT_TYPE, res.toString() });
       res.setLength(0);

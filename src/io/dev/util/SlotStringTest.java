@@ -1,7 +1,6 @@
 package io.dev.util;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -465,11 +464,6 @@ final class SlotStringTest {
       this.expected = expected;
       this.pattern = pattern;
       this.dest = dest;
-    }
-
-    @Override
-    public String toString() {
-      return "TestCase [id=" + id + ", expected=" + expected + ", pattern=" + pattern + ", dest=" + dest + "]";
     }
   }
 }
