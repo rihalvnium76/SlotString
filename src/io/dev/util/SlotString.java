@@ -24,9 +24,9 @@ public class SlotString {
   private static final int KEY_TYPE = 1;
 
   /**
-   * 是否在编译模式.
+   * 编译结果缓冲区.
    */
-  private boolean compiling;
+  private ArrayList<Object[]> symbols;
   /**
    * 编译的字符串片段.
    */
@@ -93,10 +93,8 @@ public class SlotString {
     }
     StringBuilder res = new StringBuilder();
     StringBuilder key = new StringBuilder();
-    ArrayList<Object[]> symbols = new ArrayList<>();
-    compiling = true;
-    parse(pattern, res, key, symbols);
-    compiling = false;
+    symbols = new ArrayList<>();
+    parse(pattern, res, key, null);
     if (res.length() != 0) {
       symbols.add(new Object[] { TEXT_TYPE, res.toString() });
     }
@@ -107,6 +105,7 @@ public class SlotString {
       types[i] = ((Integer) symbol[0]).intValue();
       parts[i] = (String) symbol[1];
     }
+    symbols = null;
   }
   
   /**
@@ -189,10 +188,9 @@ public class SlotString {
    * @param pattern 模板字符串.
    * @param res 使用的结果缓冲区.
    * @param key 使用的键名缓冲区.
-   * @param ext 占位符替换表或编译结果缓冲区.
+   * @param dest 占位符替换表.
    */
-  @SuppressWarnings("unchecked")
-  private void parse(String pattern, StringBuilder res, StringBuilder key, Object ext) {
+  private void parse(String pattern, StringBuilder res, StringBuilder key, Map<String, Object> dest) {
     int state = 0;
     char prev = 0;
     for (int i = 0; i < pattern.length(); ++i) {
@@ -221,10 +219,10 @@ public class SlotString {
       } else if (state == 2) {
         if (c == '}') {
           state = 0;
-          if (compiling) {
-            parseCompile(res, key, (ArrayList<Object[]>) ext);
+          if (symbols != null) {
+            parseCompile(res, key);
           } else {
-            parseQformat(res, key, (Map<String, Object>) ext);
+            parseQformat(res, key, dest);
           }
         } else if (c == '\\') {
           state = 4;
@@ -259,9 +257,8 @@ public class SlotString {
    * compile 的解析结果记录逻辑.
    * @param res 使用的结果缓冲区.
    * @param key 使用的键名缓冲区.
-   * @param symbols 编译结果缓冲区.
    */
-  private void parseCompile(StringBuilder res, StringBuilder key, ArrayList<Object[]> symbols) {
+  private void parseCompile(StringBuilder res, StringBuilder key) {
     if (res.length() != 0) {
       symbols.add(new Object[] { TEXT_TYPE, res.toString() });
       res.setLength(0);
