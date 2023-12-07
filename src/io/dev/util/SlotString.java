@@ -2,6 +2,7 @@ package io.dev.util;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -15,26 +16,28 @@ import java.util.Map;
 public class SlotString {
   
   /**
-   * 文本类型的字符串片段.
+   * 文本类型的字符串片段.<br>
+   * 写入和比较均用同一常量可直接引用地址比较，避免拆箱.
    */
-  private static final int TEXT_TYPE = 0;
+  private static final Integer TEXT_TYPE = 0;
   /**
-   * 键名类型的字符串片段.
+   * 键名类型的字符串片段.<br>
+   * 写入和比较均用同一常量可直接引用地址比较，避免拆箱.
    */
-  private static final int KEY_TYPE = 1;
+  private static final Integer KEY_TYPE = 1;
 
   /**
-   * 编译结果缓冲区.
+   * 是否编译中.
    */
-  private ArrayList<Object[]> assemblies;
+  private boolean compiling;
   /**
    * 编译的字符串片段.
    */
-  private String[] parts;
+  private List<String> parts;
   /**
    * 编译的字符串片段的类型.
    */
-  private int[] types;
+  private List<Integer> types;
   /**
    * 多线程支持.
    */
@@ -91,21 +94,17 @@ public class SlotString {
     if (pattern == null) {
       return;
     }
+    compiling = true;
     StringBuilder res = new StringBuilder();
     StringBuilder key = new StringBuilder();
-    assemblies = new ArrayList<>();
+    parts = new ArrayList<>();
+    types = new ArrayList<>();
     parse(pattern, res, key, null);
     if (res.length() != 0) {
-      assemblies.add(new Object[] { TEXT_TYPE, res.toString() });
+      types.add(TEXT_TYPE);
+      parts.add(res.toString());
     }
-    parts = new String[assemblies.size()];
-    types = new int[assemblies.size()];
-    for (int i = 0; i < assemblies.size(); ++i) {
-      Object[] assembly = assemblies.get(i);
-      types[i] = ((Integer) assembly[0]).intValue();
-      parts[i] = (String) assembly[1];
-    }
-    assemblies = null;
+    compiling = false;
   }
   
   /**
@@ -121,14 +120,14 @@ public class SlotString {
       return null;
     }
     StringBuilder res = new StringBuilder();
-    for (int i = 0; i < types.length; ++i) {
-      int type = types[i];
+    for (int i = 0; i < types.size(); ++i) {
+      Integer type = types.get(i);
       if (type == TEXT_TYPE) {
-        res.append(parts[i]);
+        res.append(parts.get(i));
       } else if (type == KEY_TYPE) {
         Object val = null;
         if (dest != null) {
-          val = dest.get(parts[i]);
+          val = dest.get(parts.get(i));
         }
         res.append(asString(val, false));
       }
@@ -222,7 +221,7 @@ public class SlotString {
       } else if (state == 2) {
         if (c == '}') {
           state = 0;
-          if (assemblies != null) {
+          if (compiling) {
             parseCompile(res, key);
           } else {
             parseQformat(res, key, dest);
@@ -263,9 +262,11 @@ public class SlotString {
    */
   private void parseCompile(StringBuilder res, StringBuilder key) {
     if (res.length() != 0) {
-      assemblies.add(new Object[] { TEXT_TYPE, res.toString() });
+      types.add(TEXT_TYPE);
+      parts.add(res.toString());
       res.setLength(0);
     }
-    assemblies.add(new Object[] { KEY_TYPE, key.toString() });
+    types.add(KEY_TYPE);
+    parts.add(key.toString());
   }
 }
