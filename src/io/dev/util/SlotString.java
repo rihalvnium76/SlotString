@@ -15,18 +15,18 @@ import java.util.Map;
 public class SlotString {
   
   /**
-   * 文本类型 的 编译的字符串片段.
+   * 文本类型的字符串片段.
    */
   private static final int TEXT_TYPE = 0;
   /**
-   * 键名类型 的 编译的字符串片段.
+   * 键名类型的字符串片段.
    */
   private static final int KEY_TYPE = 1;
 
   /**
    * 编译结果缓冲区.
    */
-  private ArrayList<Object[]> symbols;
+  private ArrayList<Object[]> assemblies;
   /**
    * 编译的字符串片段.
    */
@@ -49,18 +49,18 @@ public class SlotString {
   private StringBuilder key;
 
   /**
-   * 创建非多线程模式且不使用预编译模板字符串功能的格式化器.<br>
-   * 适用于使用不同的模板字符串进行格式化.<br>
-   * 仅 qformat 方法可用.
+   * 创建不支持多线程和编译模板字符串的格式化器.<br>
+   * 适用于格式化不同的模板字符串.<br>
+   * 仅 {@code qformat} 方法可用.
    */
   public SlotString() {
     this(false);
   }
 
   /**
-   * 外部调用时创建不使用预编译模板字符串功能的格式化器，可指定是否开启多线程支持.<br>
-   * 适用于使用不同的模板字符串进行格式化.<br>
-   * 仅 qformat 方法可用.
+   * 创建不支持编译模板字符串的格式化器，可指定是否开启多线程支持.<br>
+   * 适用于格式化不同的模板字符串.<br>
+   * 仅 {@code qformat} 方法可用.
    * @param multiThread 是否开启多线程支持.
    */
   public SlotString(boolean multiThread) {
@@ -72,9 +72,9 @@ public class SlotString {
   }
   
   /**
-   * 创建开启多线程支持，且预编译模板符串的格式化器.<br>
-   * 适用于使用相同的模板字符串进行格式化.<br>
-   * 全部方法可用，但编译的结果，format 方法会使用，而 qformat 方法不使用.
+   * 创建支持多线程和编译模板符串的格式化器.<br>
+   * 适用于多次格式化同一的模板字符串.<br>
+   * 全部方法可用，但编译的结果仅 {@code format} 方法使用，而 {@code qformat} 方法不使用.
    * @param pattern 模板符串.
    */
   public SlotString(String pattern) {
@@ -83,8 +83,8 @@ public class SlotString {
   }
 
   /**
-   * 预编译模板符串并存储编译结果.<br>
-   * 可加速 format 方法的格式化.
+   * 编译模板符串并存储编译结果.<br>
+   * 用于加速 {@code format} 方法格式化.
    * @param pattern 模板符串.
    */
   protected void compile(String pattern) {
@@ -93,24 +93,25 @@ public class SlotString {
     }
     StringBuilder res = new StringBuilder();
     StringBuilder key = new StringBuilder();
-    symbols = new ArrayList<>();
+    assemblies = new ArrayList<>();
     parse(pattern, res, key, null);
     if (res.length() != 0) {
-      symbols.add(new Object[] { TEXT_TYPE, res.toString() });
+      assemblies.add(new Object[] { TEXT_TYPE, res.toString() });
     }
-    parts = new String[symbols.size()];
-    types = new int[symbols.size()];
-    for (int i = 0; i < symbols.size(); ++i) {
-      Object[] symbol = symbols.get(i);
-      types[i] = ((Integer) symbol[0]).intValue();
-      parts[i] = (String) symbol[1];
+    parts = new String[assemblies.size()];
+    types = new int[assemblies.size()];
+    for (int i = 0; i < assemblies.size(); ++i) {
+      Object[] assembly = assemblies.get(i);
+      types[i] = ((Integer) assembly[0]).intValue();
+      parts[i] = (String) assembly[1];
     }
-    symbols = null;
+    assemblies = null;
   }
   
   /**
-   * 使用预编译的模板字符串进行格式化，模板字符串中的占位符将会被替换为替换表中对应的值.<br>
-   * 未先进行预编译字符串调用该方法会返回 null.
+   * 格式化编译的模板字符串.<br>
+   * 模板字符串中的占位符会根据其名称被替换为替换表中对应的值.<br>
+   * 未先编译模板字符串调用该方法会返回 {@code null}.
    * 
    * @param dest 占位符替换表.
    * @return 输出字符串.
@@ -136,7 +137,9 @@ public class SlotString {
   }
   
   /**
-   * 不使用预编译结果直接根据模板字符串进行格式化，模板字符串中的占位符将会被替换为替换表中对应的值.
+   * 不编译直接格式化传入的模板字符串.<br>
+   * 模板字符串中的占位符会根据其名称被替换为替换表中对应的值.
+   * 
    * @param pattern 模板字符串.
    * @param dest 占位符替换表.
    * @return 输出字符串.
@@ -163,10 +166,10 @@ public class SlotString {
   /**
    * 将替换表的值转化为字符串.<br>
    * 重写该方法，并在新实现开头调用 {@code super.asString(val, true)} 可实现在原有转换规则的基础上扩展.<br>
-   * 该方法 preventDefault 为 true，遇到非 null 和 BigDecimal 类的 val 会返回 null.
+   * 该方法 {@code preventDefault} 为 {@code true} 时，遇到非 {@code null} 和 {@code BigDecimal} 类的 {@code val} 会返回 {@code null}.
    *  
    * @param val 替换表的值
-   * @param preventDefault 是否阻止默认的调用 toString() 行为.
+   * @param preventDefault 是否阻止默认的调用 {@code toString()} 行为.
    * @return 转换后的字符串.
    */
   protected String asString(Object val, boolean preventDefault) {
@@ -183,7 +186,7 @@ public class SlotString {
   }
   
   /**
-   * compile 和 qformat 的公共解析部分.
+   * {@code compile} 和 {@code qformat} 方法的公共解析部分.
    * 
    * @param pattern 模板字符串.
    * @param res 使用的结果缓冲区.
@@ -219,7 +222,7 @@ public class SlotString {
       } else if (state == 2) {
         if (c == '}') {
           state = 0;
-          if (symbols != null) {
+          if (assemblies != null) {
             parseCompile(res, key);
           } else {
             parseQformat(res, key, dest);
@@ -240,7 +243,7 @@ public class SlotString {
   }
   
   /**
-   * qformat 的替换表值处理逻辑.
+   * {@code qformat} 方法的替换表值处理逻辑.
    * @param res 使用的结果缓冲区.
    * @param key 使用的键名缓冲区.
    * @param dest 占位符替换表.
@@ -254,15 +257,15 @@ public class SlotString {
   }
   
   /**
-   * compile 的解析结果记录逻辑.
+   * {@code compile} 方法的解析结果记录逻辑.
    * @param res 使用的结果缓冲区.
    * @param key 使用的键名缓冲区.
    */
   private void parseCompile(StringBuilder res, StringBuilder key) {
     if (res.length() != 0) {
-      symbols.add(new Object[] { TEXT_TYPE, res.toString() });
+      assemblies.add(new Object[] { TEXT_TYPE, res.toString() });
       res.setLength(0);
     }
-    symbols.add(new Object[] { KEY_TYPE, key.toString() });
+    assemblies.add(new Object[] { KEY_TYPE, key.toString() });
   }
 }
