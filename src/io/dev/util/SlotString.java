@@ -26,7 +26,7 @@ public class SlotString {
   /**
    * 编译结果缓冲区.
    */
-  private ArrayList<Object[]> assemblies;
+  private ArrayList<Object> assemblies;
   /**
    * 编译的字符串片段.
    */
@@ -96,14 +96,15 @@ public class SlotString {
     assemblies = new ArrayList<>();
     parse(pattern, res, key, null);
     if (res.length() != 0) {
-      assemblies.add(new Object[] { TEXT_TYPE, res.toString() });
+      assemblies.add(TEXT_TYPE);
+      assemblies.add(res.toString());
     }
-    parts = new String[assemblies.size()];
-    types = new int[assemblies.size()];
-    for (int i = 0; i < assemblies.size(); ++i) {
-      Object[] assembly = assemblies.get(i);
-      types[i] = ((Integer) assembly[0]).intValue();
-      parts[i] = (String) assembly[1];
+    int size = assemblies.size() / 2;
+    types = new int[size];
+    parts = new String[size];
+    for (int i = 0, p = 0; i < assemblies.size(); ++p) {
+      types[p] = ((Integer) assembly.get(i++)).intValue();
+      parts[p] = (String) assembly.get(i++);
     }
     assemblies = null;
   }
@@ -263,9 +264,11 @@ public class SlotString {
    */
   private void parseCompile(StringBuilder res, StringBuilder key) {
     if (res.length() != 0) {
-      assemblies.add(new Object[] { TEXT_TYPE, res.toString() });
+      assemblies.add(TEXT_TYPE);
+      assemblies.add(res.toString());
       res.setLength(0);
     }
-    assemblies.add(new Object[] { KEY_TYPE, key.toString() });
+    assemblies.add(KEY_TYPE);
+    assemblies.add(key.toString());
   }
 }
