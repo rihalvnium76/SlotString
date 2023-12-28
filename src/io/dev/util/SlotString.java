@@ -38,7 +38,7 @@ public class SlotString {
   /**
    * 多线程支持.
    */
-  private boolean multiThread;
+  private final boolean multiThread;
   /**
    * 共用的结果缓冲区（仅非多线程可用）.
    */
@@ -103,8 +103,8 @@ public class SlotString {
     types = new int[size];
     parts = new String[size];
     for (int i = 0, p = 0; i < assemblies.size(); ++p) {
-      types[p] = ((Integer) assembly.get(i++)).intValue();
-      parts[p] = (String) assembly.get(i++);
+      types[p] = (Integer) assemblies.get(i++);
+      parts[p] = (String) assemblies.get(i++);
     }
     assemblies = null;
   }
