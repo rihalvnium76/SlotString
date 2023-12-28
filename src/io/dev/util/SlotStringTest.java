@@ -34,7 +34,7 @@ final class SlotStringTest {
     genTestCases();
     testQformat();
     testCompileFormat();
-    testHybirdFormat();
+    testMixedFormat();
     testOverrideAsStringFormat();
     testPerformance();
     
@@ -182,9 +182,9 @@ final class SlotStringTest {
     });
   }
 
-  private void testHybirdFormat() {
+  private void testMixedFormat() {
     testSamePatternDiffDestCompileFormatOnMultiThread(true);
-    logi("testHybirdFormat", "Hybird Format Test Passed");
+    logi("testMixedFormat", "Mixed Format Test Passed");
   }
   
   private void testOverrideAsStringFormat() {

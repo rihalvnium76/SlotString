@@ -24,6 +24,10 @@ public class SlotString {
   private static final int KEY_TYPE = 1;
 
   /**
+   * 多线程支持.
+   */
+  private final boolean multiThread;
+  /**
    * 编译结果缓冲区.
    */
   private ArrayList<Object> assemblies;
@@ -35,10 +39,6 @@ public class SlotString {
    * 编译的字符串片段的类型.
    */
   private int[] types;
-  /**
-   * 多线程支持.
-   */
-  private final boolean multiThread;
   /**
    * 共用的结果缓冲区（仅非多线程可用）.
    */
